@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Analytical Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <style>
+    .card{border:1px solid #e5e7eb;border-radius:0.75rem}
+    .pill{padding:.125rem .5rem;border-radius:9999px;font-size:.75rem}
+    .pill.low{background:#ecfdf5;color:#065f46}
+    .pill.mod{background:#fffbeb;color:#92400e}
+    .pill.high{background:#fef2f2;color:#991b1b}
+    .mono{font-feature-settings:"tnum";font-variant-numeric:tabular-nums}
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="p-4 max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-4 mb-6 border-b border-gray-200">
+      <div class="flex items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l-2 2H5a2 2 0 00-2 2v7a2 2 0 002 2h4m12-8a2 2 0 00-2-2h-3v10h5V11z"/>
+        </svg>
+        <h1 class="text-2xl md:text-3xl font-bold">FBC Disease Risk Predictor Dashboard</h1>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <label for="patient" class="text-sm font-semibold text-gray-700">Select Patient</label>
+        <select id="patient" class="border border-gray-300 rounded-md shadow-sm p-2 bg-white text-gray-700 focus:ring-blue-500 focus:border-blue-500">
+          <option>Normal</option>
+          <option>Anemia</option>
+          <option>Infection Risk</option>
+          <option>Cardiovascular Risk</option>
+          <option>Leukemia Risk</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Top Summary -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="card bg-white p-5">
+        <div class="text-sm text-gray-600 mb-1">Predicted Disease (Rule-based)</div>
+        <div id="predLabel" class="text-2xl font-semibold">—</div>
+        <div id="predNote" class="text-xs text-gray-500 mt-1">Derived from CBC rule thresholds used in your Colab.</div>
+      </div>
+      <div class="card bg-white p-5">
+        <div class="text-sm text-gray-600 mb-2">Overall Risk Snapshot</div>
+        <div class="flex gap-2 flex-wrap" id="riskPills"></div>
+      </div>
+      <div class="card bg-white p-5">
+        <div class="text-sm text-gray-600 mb-2">Clinical Recommendations</div>
+        <pre id="recommendations" class="whitespace-pre-wrap text-sm leading-6"></pre>
+      </div>
+    </section>
+
+    <!-- Risk Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div class="card bg-white p-6 flex flex-col items-center">
+        <div class="text-base font-medium mb-3">Anemia Risk</div>
+        <div class="w-40 h-40"><canvas id="anemiaChart"></canvas></div>
+      </div>
+      <div class="card bg-white p-6 flex flex-col items-center">
+        <div class="text-base font-medium mb-3">Infection Risk</div>
+        <div class="w-40 h-40"><canvas id="infectionChart"></canvas></div>
+      </div>
+      <div class="card bg-white p-6 flex flex-col items-center">
+        <div class="text-base font-medium mb-3">Cardiovascular Risk</div>
+        <div class="w-40 h-40"><canvas id="cardioChart"></canvas></div>
+      </div>
+      <div class="card bg-white p-6 flex flex-col items-center">
+        <div class="text-base font-medium mb-3">Leukemia Risk</div>
+        <div class="w-40 h-40"><canvas id="leukemiaChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- CBC Table + Feature Hints -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 card bg-white p-6">
+        <h3 class="text-lg font-semibold mb-4">CBC Input Parameters</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 text-left text-gray-700">
+                <th class="px-4 py-2">Parameter</th>
+                <th class="px-4 py-2">Value</th>
+                <th class="px-4 py-2">Unit</th>
+                <th class="px-4 py-2">Parameter</th>
+                <th class="px-4 py-2">Value</th>
+                <th class="px-4 py-2">Unit</th>
+              </tr>
+            </thead>
+            <tbody id="cbcTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card bg-white p-6">
+  <h3 class="text-lg font-semibold mb-3 text-gray-800">Explainable AI (EXAI) Insights</h3>
+  
+  <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded-md">
+    <p class="text-xs text-blue-800 leading-relaxed">
+      These insights highlight the key blood parameters that most strongly influenced the AI’s assessment for this patient. They provide a clear, patient-specific rationale — helping clinicians understand *why* certain risks (e.g., anemia, infection, cardiovascular stress, or leukemia) were flagged. This supports earlier recognition of abnormal CBC trends and more informed clinical decision-making.
+    </p>
+  </div>
+  
+  <ul id="expList" class="space-y-3 text-sm">
+    </ul>
+</div>
+
+    </section>
+  </div>
+<script>
+    // Register Chart.js plugin
+    Chart.register(ChartDataLabels);
+
+    // ==== SAMPLE PATIENTS (for dummy data, now commented out) ====
+    // These patients are used for the rule-based logic only if the API call fails.
+    const patientData = {
+      "Normal": {
+        "WBC": 7.0, "Lymphocytes": 30, "Neutrophils": 55, "RBC": 4.5,
+        "Hemoglobin": 14.0, "Hematocrit": 42, "Platelets": 250, "NLR": 1.83,
+        "MCV": 85, "MCH": 29, "MCHC": 33, "RDW": 13.5, "MPV": 9.8,
+        "PDW": 14.2, "PCT": 0.25, "Basophils": 0.5, "Eosinophils": 2.5,
+        "Monocytes": 6.0, "LymphsAbs": 2.0, "NeutroAbs": 4.0,
+        "BasoAbs": 0.05, "EosAbs": 0.2
+      },
+      "Anemia": {
+        "WBC": 6.0, "Lymphocytes": 28, "Neutrophils": 56, "RBC": 3.5,
+        "Hemoglobin": 9.0, "Hematocrit": 30, "Platelets": 260, "NLR": 2.0,
+        "MCV": 75, "MCH": 24, "MCHC": 30, "RDW": 15.5, "MPV": 9.0,
+        "PDW": 13.0, "PCT": 0.22, "Basophils": 0.4, "Eosinophils": 2.1,
+        "Monocytes": 5.5, "LymphsAbs": 1.8, "NeutroAbs": 3.5,
+        "BasoAbs": 0.03, "EosAbs": 0.15
+      },
+      "Infection Risk": {
+        "WBC": 14.0, "Lymphocytes": 17, "Neutrophils": 76, "RBC": 4.9,
+        "Hemoglobin": 13.2, "Hematocrit": 40, "Platelets": 210, "NLR": 4.2,
+        "MCV": 87, "MCH": 30, "MCHC": 33.5, "RDW": 13.2, "MPV": 9.7,
+        "PDW": 14.1, "PCT": 0.24, "Basophils": 0.6, "Eosinophils": 2.3,
+        "Monocytes": 5.8, "LymphsAbs": 1.5, "NeutroAbs": 5.8,
+        "BasoAbs": 0.04, "EosAbs": 0.22
+      },
+      "Cardiovascular Risk": {
+        "WBC": 8.5, "Lymphocytes": 20, "Neutrophils": 68, "RBC": 4.4,
+        "Hemoglobin": 13.8, "Hematocrit": 41, "Platelets": 230, "NLR": 5.2,
+        "MCV": 88, "MCH": 30, "MCHC": 34, "RDW": 13.0, "MPV": 10.0,
+        "PDW": 13.9, "PCT": 0.26, "Basophils": 0.3, "Eosinophils": 1.5,
+        "Monocytes": 6.2, "LymphsAbs": 1.7, "NeutroAbs": 5.2,
+        "BasoAbs": 0.02, "EosAbs": 0.18
+      },
+      "Leukemia Risk": {
+        "WBC": 21.0, "Lymphocytes": 9, "Neutrophils": 81, "RBC": 4.3,
+        "Hemoglobin": 12.5, "Hematocrit": 38, "Platelets": 190, "NLR": 8.1,
+        "MCV": 89, "MCH": 31, "MCHC": 34, "RDW": 14.0, "MPV": 9.6,
+        "PDW": 14.5, "PCT": 0.28, "Basophils": 0.9, "Eosinophils": 3.0,
+        "Monocytes": 7.0, "LymphsAbs": 1.0, "NeutroAbs": 6.8,
+        "BasoAbs": 0.06, "EosAbs": 0.3
+      }
+    };
+
+    // ==== UNITS ====
+    const unitMap = {
+      "WBC": "×10⁹/L", "RBC": "×10¹²/L", "Hemoglobin": "g/dL", "Hematocrit": "%",
+      "Platelets": "×10⁹/L", "NLR": "-", "MCV": "fL", "MCH": "pg", "MCHC": "g/dL",
+      "RDW": "%", "MPV": "fL", "PDW": "%", "PCT": "%", "Basophils": "%",
+      "Eosinophils": "%", "Monocytes": "%", "Lymphocytes": "%", "LymphsAbs": "×10⁹/L",
+      "Neutrophils": "%", "NeutroAbs": "×10⁹/L", "BasoAbs": "×10⁹/L", "EosAbs": "×10⁹/L"
+    };
+
+    // ==== RISK & RULE HELPERS (matches your Colab thresholds) ====
+    // These functions are now used as fallbacks or for the rule-based label/recs.
+    function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+    function riskFromCBC(c) {
+      const hgb = Number(c.Hemoglobin);
+      const wbc = Number(c.WBC);
+      const nlr = Number(c.NLR ?? (Number(c.Neutrophils) / Math.max(Number(c.Lymphocytes), 1e-6)));
+
+      const anemia = clamp01((15 - hgb) / 10) * 100;
+      const infect = clamp01((wbc - 11) / 10) * 100;
+      const cardio = clamp01(nlr / 10) * 100;
+      const leukemia = clamp01((wbc - 18) / 5) * 100;
+
+      return {
+        anemia_risk: Number(anemia.toFixed(2)),
+        infection_risk: Number(infect.toFixed(2)),
+        cardiovascular_risk: Number(cardio.toFixed(2)),
+        leukemia_risk: Number(leukemia.toFixed(2)),
+        nlr: Number(nlr.toFixed(2))
+      };
+    }
+
+    function riskFlag(v) {
+      if (v >= 75) return ['High', 'high'];
+      if (v >= 50) return ['Moderate', 'mod'];
+      return ['Low', 'low'];
+    }
+
+    function labelDisease(c) {
+      const nlr = Number(c.NLR ?? (Number(c.Neutrophils) / Math.max(Number(c.Lymphocytes), 1e-6)));
+      const flags = [];
+      if (Number(c.RBC) < 4.0 || Number(c.Hemoglobin) < 12.0 || Number(c.Hematocrit) < 36) flags.push('Anemia');
+      if (Number(c.WBC) > 11 || Number(c.Neutrophils) > 70) flags.push('Infection Risk');
+      if (nlr > 3) flags.push('Cardiovascular Risk');
+      if (Number(c.WBC) > 18) flags.push('Leukemia Risk');
+      return flags.length ? flags.join(', ') : 'Normal';
+    }
+
+    function recsFromRisk(r) {
+      const alerts = [];
+      if (r.anemia_risk > 75) alerts.push("⚠️ Anemia Warning: Retest Hemoglobin levels.");
+      if (r.infection_risk > 70) alerts.push("⚠️ Possible Infection: Consider bacterial screening.");
+      if (r.cardiovascular_risk > 80) alerts.push("⚠️ Cardiovascular Risk: Consider cardiology referral.");
+      if (r.leukemia_risk > 80) alerts.push("⚠️ Leukemia Risk: Urgent hematology consultation recommended.");
+      return alerts.length ? alerts.join("\n") : "✅ No immediate concerns detected.";
+    }
+
+    function explanationHints(c) {
+      const hints = [];
+      if (Number(c.Neutrophils) > 70) hints.push("Neutrophils > 70% tends to increase infection/leukemia likelihood.");
+      if (Number(c.Lymphocytes) < 21) hints.push("Lymphocytes < 21% associates with infection/CV risk.");
+      if (Number(c.WBC) > 16.3) hints.push("WBC > 16.3×10⁹/L supports infection/leukemia suspicion.");
+      if (Number(c.Hematocrit) < 32.2) hints.push("Low Hematocrit supports anemia.");
+      if (Number(c.Hemoglobin) < 11) hints.push("Hemoglobin ≤ 11 g/dL increases anemia risk.");
+      const nlr = Number(c.NLR ?? (Number(c.Neutrophils) / Math.max(Number(c.Lymphocytes), 1e-6)));
+      if (nlr > 3.2) hints.push("NLR > 3.2 associated with higher cardiovascular/inflammatory risk.");
+      if (Number(c.Platelets) < 150) hints.push("Platelets < 150×10⁹/L consider thrombocytopenia context.");
+      if (hints.length === 0) hints.push("CBC parameters are within generally reassuring ranges.");
+      return hints;
+    }
+
+    // ==== CHART HELPERS ====
+    function donutConfig(label, risk) {
+      const color = risk >= 75 ? 'rgb(239,68,68)' : risk >= 50 ? 'rgb(245,158,11)' : 'rgb(16,185,129)';
+      return {
+        type: 'doughnut',
+        data: {
+          labels: [label, ''],
+          datasets: [{
+            data: [risk, Math.max(0, 100 - risk)],
+            backgroundColor: [color, 'rgb(229,231,235)'],
+            borderColor: 'transparent'
+          }]
+        },
+        options: {
+          cutout: '55%',
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false },
+            datalabels: {
+              formatter: (v, ctx) => ctx.dataIndex === 0 ? v.toFixed(0) + '%' : '',
+              color: '#374151',
+              font: { weight: 'bold', size: 18 },
+              anchor: 'center',
+              align: 'center'
+            }
+          }
+        }
+      }
+    }
+
+    let anemiaChart, infectionChart, cardioChart, leukemiaChart;
+
+    function renderCharts(r) {
+      [anemiaChart, infectionChart, cardioChart, leukemiaChart].forEach(ch => { if (ch) ch.destroy(); });
+      anemiaChart = new Chart(document.getElementById('anemiaChart'), donutConfig('Anemia', r.anemia_risk));
+      infectionChart = new Chart(document.getElementById('infectionChart'), donutConfig('Infection', r.infection_risk));
+      cardioChart = new Chart(document.getElementById('cardioChart'), donutConfig('Cardiovascular', r.cardiovascular_risk));
+      leukemiaChart = new Chart(document.getElementById('leukemiaChart'), donutConfig('Leukemia', r.leukemia_risk));
+    }
+
+    function renderPills(r) {
+      const host = document.getElementById('riskPills');
+      host.innerHTML = '';
+      const items = [
+        ['Anemia', r.anemia_risk],
+        ['Infection', r.infection_risk],
+        ['Cardio', r.cardiovascular_risk],
+        ['Leukemia', r.leukemia_risk]
+      ];
+      for (const [name, val] of items) {
+        const [txt, cls] = riskFlag(val);
+        const span = document.createElement('span');
+        span.className = `pill ${cls}`;
+        span.textContent = `${name}: ${val.toFixed(0)}% (${txt})`;
+        host.appendChild(span);
+      }
+    }
+
+    function renderCBCTable(data) {
+      const tbody = document.getElementById('cbcTableBody');
+      tbody.innerHTML = '';
+      const entries = Object.entries(data);
+      const half = Math.ceil(entries.length / 2);
+      for (let i = 0; i < half; i++) {
+        const left = entries[i];
+        const right = entries[i + half];
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-gray-100';
+        tr.innerHTML = `
+          <td class="px-4 py-2">${left[0]}</td>
+          <td class="px-4 py-2 mono">${left[1]}</td>
+          <td class="px-4 py-2 text-gray-400">${unitMap[left[0]] || '-'}</td>
+          ${right ? `
+            <td class="px-4 py-2 border-l border-gray-200">${right[0]}</td>
+            <td class="px-4 py-2 mono">${right[1]}</td>
+            <td class="px-4 py-2 text-gray-400">${unitMap[right[0]] || '-'}</td>
+          ` : `<td colspan="3"></td>`}
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderExplanation(exp) {
+      const ul = document.getElementById('expList');
+      ul.innerHTML = '';
+      if (!exp || exp.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = "No explanation available.";
+        ul.appendChild(li);
+        return;
+      }
+      for (const item of exp) {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ul.appendChild(li);
+      }
+    }
+
+    // ==== MAIN UPDATE FUNCTION ====
+    async function updateAll() {
+      const key = document.getElementById('patient').value;
+      const cbc = structuredClone(patientData[key]);
+
+      // Use the actual API to get predictions
+      const apiResponse = await predictFromAPI(cbc);
+
+      let risks, label, recs, explanation;
+
+      if (apiResponse) {
+        // --- THIS IS THE LIVE API DATA ---
+        console.log("Using live API data.");
+        // The API returns 'risk_scores', 'prediction', and 'explanation'
+        risks = {
+            anemia_risk: apiResponse.risk_scores['Anemia Risk'],
+            infection_risk: apiResponse.risk_scores['Infection Risk'],
+            cardiovascular_risk: apiResponse.risk_scores['Cardiovascular Risk'],
+            leukemia_risk: apiResponse.risk_scores['Leukemia Risk']
+        };
+        label = apiResponse.prediction;
+        // Use a simple rule to generate recommendations from the API risks
+        recs = recsFromRisk(risks);
+        // The explanation is a list of strings directly from the API
+        explanation = apiResponse.explanation.map(item => `${item[0]} = ${item[1].toFixed(2)} (contributes ${item[2] > 0 ? 'positively' : 'negatively'})`);
+      } else {
+        // --- THIS IS THE DUMMY DATA FALLBACK ---
+        console.log("Using dummy rule-based data (API call failed).");
+        risks = riskFromCBC(cbc);
+        label = labelDisease(cbc);
+        recs = recsFromRisk(risks);
+        explanation = explanationHints(cbc);
+      }
+
+      // Update the UI with the chosen data (either API or dummy)
+      document.getElementById('predLabel').textContent = label;
+      document.getElementById('recommendations').textContent = recs;
+      renderPills(risks);
+      renderCharts(risks);
+      renderCBCTable(cbc);
+      renderExplanation(explanation);
+    }
+
+    // ==== ACTUAL API CALL TO BACKEND ====
+    // This function sends data to your Flask server
+    async function predictFromAPI(cbcRow) {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(cbcRow)
+        });
+
+        if (!response.ok) {
+          throw new Error(`API returned status ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+
+      } catch (error) {
+        console.error('Error fetching data from API:', error);
+        return null; // Return null on error to trigger the dummy data fallback
+      }
+    }
+
+    // Init
+    document.getElementById('patient').addEventListener('change', updateAll);
+    document.addEventListener('DOMContentLoaded', updateAll);
+</script>
+</body>
+</html>
