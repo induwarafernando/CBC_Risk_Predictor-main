@@ -19,12 +19,15 @@
 <body class="bg-gray-100 text-gray-800">
   <div class="p-4 max-w-7xl mx-auto">
     <!-- Header -->
-    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 py-4 mb-6 border-b border-gray-200">
+    <header class="flex  rounded-md flex-col md:flex-row md:items-center md:justify-between gap-4 py-4 mb-6 border-b border-gray-200">
       <div class="flex items-center gap-3">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l-2 2H5a2 2 0 00-2 2v7a2 2 0 002 2h4m12-8a2 2 0 00-2-2h-3v10h5V11z"/>
-        </svg>
-        <h1 class="text-2xl md:text-3xl font-bold">FBC Disease Risk Predictor Dashboard</h1>
+        <img width="50" src="data:image/png;base64,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" alt="external-information-and-file-regarding-a-prescription-drug-medicine-drugs-green-tal-revivo">    
+        <hgroup>
+            <h1 class="text-2xl md:text-3xl font-bold">AI-Powered Disease Insights</h1>
+            <p class="mt-2 text-sm text-gray-600 max-w-3xl">
+                Using explainable AI to provide actionable disease risk predictions and clinical interpretations from routine blood tests.
+            </p>
+        </hgroup>    
       </div>
 
       <div class="flex items-center gap-3">
@@ -42,9 +45,9 @@
     <!-- Top Summary -->
     <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <div class="card bg-white p-5">
-        <div class="text-sm text-gray-600 mb-1">Predicted Disease (Rule-based)</div>
+        <div class="text-sm text-gray-600 mb-1">Predicted Disease (based on CBC parameters)</div>
         <div id="predLabel" class="text-2xl font-semibold">—</div>
-        <div id="predNote" class="text-xs text-gray-500 mt-1">Derived from CBC rule thresholds used in your Colab.</div>
+        <div id="predNote" class="text-xs text-gray-500 mt-1">Derived from CBC thresholds</div>
       </div>
       <div class="card bg-white p-5">
         <div class="text-sm text-gray-600 mb-2">Overall Risk Snapshot</div>
